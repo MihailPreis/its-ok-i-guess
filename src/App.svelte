@@ -107,7 +107,7 @@
 
 <main>
 	<h1>it's ok, i guess</h1>
-	<h4>Guess the game from the Steam review!</h4>
+	<h4>Угадайте игру из обзора Steam!</h4>
 
 	<div class="score-container">
 		<div class="score-bubble">{ score }</div>
@@ -154,14 +154,11 @@
 
 
 	<div class="actions">
-		<a href="https://github.com/aquelemiguel/its-ok-i-guess" target="_blank">
+		<a href="https://github.com/MihailPreis/its-ok-i-guess" target="_blank">
 			<img src="icons/github.png" alt="GitHub logo" />
 		</a>
-		<a href="https://ko-fi.com/aquelemiguel" target="_blank">
-			<img src="icons/kofi.png" alt="Ko-Fi logo" />
-		</a>
-		<a href="https://paypal.com/paypalme/aquelemiguel/1" target="_blank">
-			<img src="icons/paypal.png" alt="PayPal logo" />
+		<a href="https://github.com/aquelemiguel/its-ok-i-guess" target="_blank">
+			<img src="icons/github_fork.png" alt="GitHub fork logo" />
 		</a>
 	</div>
 </main>
