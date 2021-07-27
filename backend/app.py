@@ -1,10 +1,10 @@
 import random
 
 import requests
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS, cross_origin
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='public')
 cors = CORS(app)
 app.config['CORS_HEADERS'] = 'Content-Type'
 
@@ -53,7 +53,7 @@ def _gen_items():
     return items
 
 
-@app.route("/new-round")
+@app.route("/api/new-round")
 @cross_origin()
 def new_round():
     if len(ITEMS) <= 3:
@@ -81,13 +81,13 @@ def new_round():
         'review': {
             'id': review['recommendationid'],
             'body': review['review'],
-            'play_time': review['author']['playtime_at_review'],
+            'play_time': review['author'].get('playtime_at_review') or 0,
             'recommended': review['voted_up']
         }
     })
 
 
-@app.route("/check-answer")
+@app.route("/api/check-answer")
 @cross_origin()
 def check_answer():
     appid = request.args.get('appid')
@@ -108,6 +108,16 @@ def check_answer():
         return jsonify({'answer': False})
 
 
+@app.route('/')
+def root():
+    return app.send_static_file('index.html')
+
+
+@app.route('/<path:path>')
+def send_js(path):
+    return send_from_directory('public', path)
+
+
 if __name__ == '__main__':
     _pre_init()
-    app.run(port=5001)
+    app.run(host='0.0.0.0', port=42312)

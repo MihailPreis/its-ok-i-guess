@@ -1,6 +1,5 @@
 <script lang="ts">
 	import * as _ from 'lodash';
-	import * as db from '../models/reviews.json';
 	import { onMount } from 'svelte';
   	import SvelteMarkdown from 'svelte-markdown'
 

@@ -4,10 +4,11 @@ WORKDIR /app
 
 COPY requirements.txt requirements.txt
 COPY app.py app.py
+COPY public/ public/
 
 RUN pip3 install -r requirements.txt
 
-EXPOSE 5001
+EXPOSE 42312
 
 ENTRYPOINT [ "python3" ]
 
