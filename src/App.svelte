@@ -1,86 +1,113 @@
 <script lang="ts">
 	import * as _ from 'lodash';
-	import * as db from '../models/reviews.json';
 	import { onMount } from 'svelte';
+  	import SvelteMarkdown from 'svelte-markdown'
 
 	type App = {
 		appid: number;
+		image_url: string;
 		name: string;
-		reviews: Review[];
 	};
 
 	type Review = {
+		id: string;
 		body: string;
 		play_time: number;
 		recommended: boolean;
 	}
 
-	onMount(() => {
-		data = data.map(app => ({
-			...app,
-			reviews: app.reviews as Review[]
-		}));
+	type Round = {
+		items: App[];
+		review: Review;
+	};
 
+	type Answer = {
+		answer: boolean;
+	};
+
+	function api<T>(url: string): Promise<T> {
+		return fetch(url)
+			.then(response => {
+				if (!response.ok) {
+					throw new Error(response.statusText)
+				}
+				return response.json().then(data => data as T)
+			})
+	}
+
+	onMount(() => {
 		const storedHighscore = localStorage.getItem('highscore');
 		highscore = storedHighscore ? parseInt(storedHighscore) : 0;
+
+		generateNewRound();
 	})
 
 	const toggleMute = () => {
 		isMuted = !isMuted;
 	}
 
-	const getRandomApps = (n: number): App[] => {
-		return _.sampleSize(data, n);
-	}
-
 	const getGuessClass = (app: App): string => {
-		return app.appid === correct.appid ? 'correct' : 'incorrect';
+		return app.appid === answerApp.appid ? 'correct' : 'incorrect';
 	}
 
 	const generateNewRound = () => {
-		apps = getRandomApps(3);
-		correct = _.sample(apps);
-		review = _.sample(correct.reviews);
-		hasGuessed = false;
+		isLoading = true;
+		answerApp = null;
+		api<Round>('/api/new-round')
+			.then(i => {
+				answer = null;
+				apps = i.items;
+				review = i.review;
+				isLoading = false;
+			})
+			.catch(e => {
+				isLoading = false;
+				error = true;
+			})
 	}
 
 	const onGuess = (guess: App) => {
-		hasGuessed = true;
+		isLoading = true;
+		answerApp = guess;
+		api<Round>(`/api/check-answer?appid=${guess.appid}&id=${review.id}`)
+			.then(i => {
+				answer = i;
 
-		if (guess.appid === correct.appid) {
-			score++;
-			highscore = score > highscore ? score : highscore;
-			localStorage.setItem('highscore', highscore.toString());
+				if (answer.answer) {
+					score++;
+					highscore = score > highscore ? score : highscore;
+					localStorage.setItem('highscore', highscore.toString());
+					isMuted ? '' : new Audio('sfx/correct.mp3').play();
+					setTimeout(() => generateNewRound(), 1000);
+				}
+				else {
+					score = Math.max(0, score - 1);
+					isMuted ? '' : new Audio('sfx/wrong.mp3').play();
+					setTimeout(() => generateNewRound(), 1000);
+				}
 
-			isMuted ? '' : new Audio('sfx/correct.mp3').play();
-
-			setTimeout(() => {
-				generateNewRound();
-			}, 1500);
-		}
-		else {
-			score = 0;
-			isMuted ? '' : new Audio('sfx/wrong.mp3').play();
-
-			setTimeout(() => {
-				generateNewRound();
-			}, 3000);
-		}
+				isLoading = false;
+			})
+			.catch(e => {
+				isLoading = false;
+				error = true;
+			})
 	}
 	
 	let score = 0;
 	let highscore;
 	let isMuted = false;
-	let data: App[] = db['default'];
-	let apps: App[] = getRandomApps(3);
-	let correct: App = _.sample(apps);
-	let review: Review = _.sample(correct.reviews);
-	let hasGuessed = false;
+	let apps: App[] = [];
+	let review: Review;
+	let answer: Answer;
+	let answerApp: App;
+	let isLoading = true;
+	let error = false;
 </script>
 
 <main>
 	<h1>it's ok, i guess</h1>
-	<h4>Guess the game from the Steam review!</h4>
+	<h4>Угадайте игру из обзора Steam!</h4>
 
 	<div class="score-container">
 		<div class="score-bubble">{ score }</div>
@@ -88,34 +115,50 @@
 
 	<div class="highscore">{ highscore }</div>
 
-	<div class="choice-wrapper">
-		<img class="mute-button {isMuted ? 'muted' : ''}" src="icons/mute.png" alt="Mute button" on:click={toggleMute} />
-		<div class="choice-container">
-		{#each apps as app}
-			<div class="choice {hasGuessed && getGuessClass(app)}"on:click={() => onGuess(app)} style="{hasGuessed ? 'pointer-events:none;' : ''}">
-				<img src="headers/{app.appid}_header.jpg" alt="{app.name} Banner" />
-				<span>{ app.name }</span>
-			</div>
-		{/each}
-		</div>
-	</div>
+	{#if isLoading}
 
-	<div class="review-container">
-		<img class="thumb-icon" src="icons/{ review.recommended ? 'thumbs-up.png' : 'thumbs-down.png' }" alt="" />
-		<span class="play-time">{ review.play_time } hours on record</span>
-		<span class="review-body">{ review.body }</span>
-	</div>
+		<div class="loader"></div>
+
+	{:else}
+
+		{#if error}
+
+			<br><br><br>
+			<h4>Произошла ошибка, перезагрузите страницу.</h4>
+
+		{:else}
+
+			<div class="choice-wrapper">
+				<img class="mute-button {isMuted ? 'muted' : ''}" src="icons/mute.png" alt="Mute button" on:click={toggleMute} />
+				<div class="choice-container">
+				{#each apps as app}
+					<div class="choice {answerApp && getGuessClass(app)}" on:click={() => onGuess(app)} style="{answer ? 'pointer-events:none;' : ''}">
+						<img src="{ app.image_url }" alt="{app.name} Banner" />
+						<span>{ app.name }</span>
+					</div>
+				{/each}
+				</div>
+			</div>
+
+			<div class="review-container">
+			{#if review}
+				<img class="thumb-icon" src="icons/{ review.recommended ? 'thumbs-up.png' : 'thumbs-down.png' }" alt="" />
+				<span class="play-time">{ review.play_time } hours on record</span>
+				<span class="review-body"><SvelteMarkdown source={ review.body } /></span>
+			{/if}
+			</div>
+
+		{/if}
+
+	{/if}
 
 
 	<div class="actions">
-		<a href="https://github.com/aquelemiguel/its-ok-i-guess" target="_blank">
+		<a href="https://github.com/MihailPreis/its-ok-i-guess" target="_blank">
 			<img src="icons/github.png" alt="GitHub logo" />
 		</a>
-		<a href="https://ko-fi.com/aquelemiguel" target="_blank">
-			<img src="icons/kofi.png" alt="Ko-Fi logo" />
-		</a>
-		<a href="https://paypal.com/paypalme/aquelemiguel/1" target="_blank">
-			<img src="icons/paypal.png" alt="PayPal logo" />
+		<a href="https://github.com/aquelemiguel/its-ok-i-guess" target="_blank">
+			<img src="icons/github_fork.png" alt="GitHub fork logo" />
 		</a>
 	</div>
 </main>
@@ -365,5 +408,21 @@
 		.actions img {
 			padding: 8px;
 		}
+	}
+
+	.loader {
+		border: 16px solid #f3f3f3; /* Light grey */
+		border-top: 16px solid #3498db; /* Blue */
+		border-radius: 50%;
+		width: 64px;
+		height: 64px;
+		margin: 100px;
+		align-self: center;
+		animation: spin 2s linear infinite;
+	}
+
+	@keyframes spin {
+		0% { transform: rotate(0deg); }
+		100% { transform: rotate(360deg); }
 	}
 </style>
